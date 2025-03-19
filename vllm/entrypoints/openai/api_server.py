@@ -59,7 +59,7 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               PoolingCompletionRequest,
                                               PoolingRequest, PoolingResponse,
                                               RerankRequest, RerankResponse,
-                                              ScoreRequest, ScoreResponse,
+                                              ScoreRequest, ScoreResponse, StreamOptions,
                                               TokenizeRequest,
                                               TokenizeResponse,
                                               TranscriptionRequest,
@@ -97,6 +97,24 @@ prometheus_multiproc_dir: tempfile.TemporaryDirectory
 logger = init_logger('vllm.entrypoints.openai.api_server')
 
 _running_tasks: set[asyncio.Task] = set()
+
+CMD_ARGS: Optional[Namespace] = None
+
+
+def set_global_cmd_args(args: Namespace):
+    global CMD_ARGS
+    CMD_ARGS = args
+
+
+def update_completion_request_based_on_args(request: ChatCompletionRequest | CompletionRequest):
+    if (CMD_ARGS is None) or (not CMD_ARGS.always_include_usage):
+        return request
+    if (request.stream is None) or (not request.stream):
+        return request
+    if request.stream_options is None:
+        request.stream_options = StreamOptions()
+    request.stream_options.include_usage = True
+    return request
 
 
 @asynccontextmanager
@@ -452,6 +470,7 @@ async def show_version():
 @load_aware_call
 async def create_chat_completion(request: ChatCompletionRequest,
                                  raw_request: Request):
+    request = update_completion_request_based_on_args(request)
     handler = chat(raw_request)
     if handler is None:
         return base(raw_request).create_error_response(
@@ -473,6 +492,7 @@ async def create_chat_completion(request: ChatCompletionRequest,
 @with_cancellation
 @load_aware_call
 async def create_completion(request: CompletionRequest, raw_request: Request):
+    request = update_completion_request_based_on_args(request)
     handler = completion(raw_request)
     if handler is None:
         return base(raw_request).create_error_response(
@@ -976,6 +996,7 @@ def create_server_socket(addr: tuple[str, int]) -> socket.socket:
 async def run_server(args, **uvicorn_kwargs) -> None:
     logger.info("vLLM API server version %s", VLLM_VERSION)
     logger.info("args: %s", args)
+    set_global_cmd_args(args)
 
     if args.tool_parser_plugin and len(args.tool_parser_plugin) > 3:
         ToolParserManager.import_tool_parser(args.tool_parser_plugin)

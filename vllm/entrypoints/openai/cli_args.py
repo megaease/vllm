@@ -264,6 +264,13 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         help=
         "If set to True, enable tracking server_load_metrics in the app state."
     )
+    parser.add_argument(
+        "--always-include-usage",
+        action='store_true',
+        default=False,
+        help=
+        "If set to True, always include usage in the response, even if the request does not ask for it."
+    )
 
     return parser
 
