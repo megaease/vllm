@@ -479,13 +479,17 @@ async def create_chat_completion(request: ChatCompletionRequest,
     generator = await handler.create_chat_completion(request, raw_request)
 
     if isinstance(generator, ErrorResponse):
+        headers = {"Ease-Response-Type": "error"}
         return JSONResponse(content=generator.model_dump(),
-                            status_code=generator.code)
+                            status_code=generator.code, 
+                            headers=headers)
 
     elif isinstance(generator, ChatCompletionResponse):
-        return JSONResponse(content=generator.model_dump())
-
-    return StreamingResponse(content=generator, media_type="text/event-stream")
+        headers = {"Ease-Response-Type": "json"}
+        return JSONResponse(content=generator.model_dump(), headers=headers)
+    
+    headers = {"Ease-Response-Type": "stream"}
+    return StreamingResponse(content=generator, media_type="text/event-stream", headers=headers)
 
 
 @router.post("/v1/completions", dependencies=[Depends(validate_json_request)])
@@ -500,12 +504,15 @@ async def create_completion(request: CompletionRequest, raw_request: Request):
 
     generator = await handler.create_completion(request, raw_request)
     if isinstance(generator, ErrorResponse):
+        headers = {"Ease-Response-Type": "error"}
         return JSONResponse(content=generator.model_dump(),
-                            status_code=generator.code)
+                            status_code=generator.code, headers=headers)
     elif isinstance(generator, CompletionResponse):
-        return JSONResponse(content=generator.model_dump())
+        headers = {"Ease-Response-Type": "json"}
+        return JSONResponse(content=generator.model_dump(), headers=headers)
 
-    return StreamingResponse(content=generator, media_type="text/event-stream")
+    headers = {"Ease-Response-Type": "stream"}
+    return StreamingResponse(content=generator, media_type="text/event-stream", headers=headers)
 
 
 @router.post("/v1/embeddings", dependencies=[Depends(validate_json_request)])
